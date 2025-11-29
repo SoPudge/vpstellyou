@@ -1,0 +1,33 @@
+{
+  "mail": {
+    "sender": "xxx@qq.com",
+    "password": "smtp授权码",
+    "smtp_server": "smtp.qq.com",
+    "smtp_port": 465,
+    "use_tls": true,
+    "receivers": ["xxx@qq.com", "yyy@qq.com"],
+    "subject_in_stock": "{name} 已经补货",
+    "subject_out_of_stock": "{name} 缺货中",
+    "content_in_stock": "购买地址是</br><a href=\"{url}\">点击购买 {name}</a>",
+    "content_out_of_stock": "{name} 当前缺货，URL: {url}",
+    "heartbeat_time": "08:00",
+    "heartbeat_subject": "{name} 程序存活",
+    "heartbeat_content": "{time} 心跳：{name} 正常运行"
+  },
+  "global": {
+    "check_interval": 60,
+    "log_level": "DEBUG"
+  },
+  "monitors": [
+    {
+      "name": "DC6-512M-500G-49.9",
+      "url": "https://bwh88.net/cart.php?a=add&pid=94&aff=58257",
+      "pattern": "Out of Stock"
+    },
+    {
+      "name": "NetCup-1o",
+      "url": "https://www.netcup.com/de/server/vps/vps-piko-g11s-12m",
+      "pattern": "Produkt ist ausverkauft"
+    }
+  ]
+}

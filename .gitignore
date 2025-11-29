@@ -131,3 +131,4 @@ dmypy.json
 #self
 *.log
 *_pwd.py
+config.json

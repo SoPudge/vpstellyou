@@ -22,7 +22,8 @@ log_file = os.path.join(script_dir, 'log.log')
 logging.basicConfig(
     filename=log_file,
     level=logging.DEBUG,
-    format='%(asctime)s %(message)s'
+    format='%(asctime)s %(message)s',
+    encoding='utf-8'
 )
 
 def get_stock(url, pattern, headers=None):
@@ -79,10 +80,11 @@ def send_mail(sender, password, smtp_server, receivers, message, smtp_port=25, u
         return False
     return False
 
-def test_mail(mail_config):
+def test_mail(mail_config, monitors):
     '''
     测试邮箱通讯是否正常
     mail_config: 邮件配置
+    monitors: 监控配置列表
     '''
     print("正在测试邮箱通讯...")
     logging.info("开始测试邮箱通讯")
@@ -96,11 +98,15 @@ def test_mail(mail_config):
     receivers = mail_config.get('receivers', [sender])
     
     # 构造测试邮件
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    subject = "VPS监控系统 - 邮箱测试"
-    content = "这是一封测试邮件。<br/><br/>发送时间：%s<br/>发件人：%s<br/>SMTP服务器：%s<br/>端口：%d<br/>使用TLS：%s" % (
-        current_time, sender, smtp_server, smtp_port, "是" if use_tls else "否"
-    )
+    subject = "VPS监控系统 - 正在监控 %d 个项目" % len(monitors)
+    content = "<table border='1'><tr><th>项目名称</th><th>URL</th></tr>"
+    
+    for monitor in monitors:
+        name = monitor.get('name', '未知项目')
+        url = monitor.get('url', '未知URL')
+        content += "<tr><td>%s</td><td>%s</td></tr>" % (name, url)
+    
+    content += "</table>"
     
     msg = MIMEText(content, 'html', 'utf-8')
     msg['From'] = _format_addr(sender)
@@ -194,11 +200,8 @@ def process_monitor(monitor, mail_config):
     # 获取邮件模板配置
     subject_in_stock = mail_config.get('subject_in_stock', '{name} 已经补货')
     content_in_stock = mail_config.get('content_in_stock', '购买地址是</br><a href="{url}">点击购买 {name}</a>')
-    heartbeat_time = mail_config.get('heartbeat_time', '08:00')
-    heartbeat_subject = mail_config.get('heartbeat_subject', '{name} 程序存活')
-    heartbeat_content = mail_config.get('heartbeat_content', '{time} 心跳：{name} 正常运行')
     
-    # 请求方案页面，获取缺货状态
+    # 请求方案页面,获取缺货状态
     # status: True = 有货, False = 无货
     try:
         status = get_stock(url, pattern, headers)
@@ -217,19 +220,7 @@ def process_monitor(monitor, mail_config):
         send_mail(sender, password, smtp_server, receivers, msg.as_string(), smtp_port, use_tls)
         logging.info("[%s] 已经补货，发送成功" % name)
     else:
-        # 解析心跳时间
-        heartbeat_hour, heartbeat_minute = map(int, heartbeat_time.split(':'))
-        current_time = datetime.now()
-        if current_time.hour == heartbeat_hour and current_time.minute == heartbeat_minute:
-            subject = heartbeat_subject.format(name=name, time=current_time.strftime('%m%d'))
-            content = heartbeat_content.format(name=name, time=current_time.strftime('%Y-%m-%d %H:%M:%S'))
-            heartbeat_msg = MIMEText(content, 'html', 'utf-8')
-            heartbeat_msg['From'] = _format_addr(sender)
-            heartbeat_msg['To'] = _format_addr(receivers[0] if receivers else sender)
-            heartbeat_msg['Subject'] = Header(subject, 'utf-8').encode()
-            send_mail(sender, password, smtp_server, receivers, heartbeat_msg.as_string(), smtp_port, use_tls)
-        else:
-            logging.info("[%s] 没有补货，不发送邮件" % name)
+        logging.info("[%s] 没有补货，不发送邮件" % name)
 
 def run_monitor(config):
     '''
@@ -240,31 +231,46 @@ def run_monitor(config):
     global_config = config.get('global', {})
     check_interval = global_config.get('check_interval', 60)
     log_level = global_config.get('log_level', 'DEBUG')
+    
+    # 从邮件配置中获取心跳时间
+    mail_config = config['mail']
+    heartbeat_time = mail_config.get('heartbeat_time', '12:00')  # 默认中午12点
 
     # 更新日志级别
     logging.getLogger().setLevel(getattr(logging, log_level, logging.DEBUG))
 
+    # 解析心跳时间
+    heartbeat_hour, heartbeat_minute = map(int, heartbeat_time.split(':'))
+
     logging.info("=" * 50)
     logging.info("程序启动，配置文件加载成功")
     logging.info("日志文件: %s" % log_file)
-    logging.info("全局配置 - 检查间隔: %d秒, 日志级别: %s" % (check_interval, log_level))
+    logging.info("全局配置 - 检查间隔: %d秒, 日志级别: %s, 心跳时间: %s" % (check_interval, log_level, heartbeat_time))
     logging.info("监控任务数量: %d" % len(config['monitors']))
     logging.info("=" * 50)
 
     print("VPS监控程序已启动")
     print("检查间隔: %d秒" % check_interval)
     print("监控任务数量: %d" % len(config['monitors']))
+    print("心跳邮件时间: %s" % heartbeat_time)
     print("日志文件: %s" % log_file)
     print("按 Ctrl+C 停止程序")
     print("-" * 50)
 
-    # 解构赋值获取邮件配置和监控列表
-    mail_config = config['mail']
+    # 获取监控列表
     monitors = config['monitors']
 
     # 循环检查
     try:
         while True:
+            current_time = datetime.now()
+            
+            # 检查是否到达心跳时间
+            if current_time.hour == heartbeat_hour and current_time.minute == heartbeat_minute:
+                logging.info("到达心跳时间，发送心跳邮件")
+                print("发送心跳邮件...")
+                test_mail(mail_config, monitors)
+            
             # 处理所有监控任务
             for monitor in monitors:
                 try:
@@ -306,7 +312,7 @@ if __name__ == '__main__':
     
     if command == 'test':
         # 测试邮箱通讯
-        test_mail(config['mail'])
+        test_mail(config['mail'], config['monitors'])
     elif command == 'run':
         # 运行监控
         run_monitor(config)

@@ -10,9 +10,7 @@
     "subject_out_of_stock": "{name} 缺货中",
     "content_in_stock": "购买地址是</br><a href=\"{url}\">点击购买 {name}</a>",
     "content_out_of_stock": "{name} 当前缺货，URL: {url}",
-    "heartbeat_time": "08:00",
-    "heartbeat_subject": "{name} 程序存活",
-    "heartbeat_content": "{time} 心跳：{name} 正常运行"
+    "heartbeat_time": "08:00"
   },
   "global": {
     "check_interval": 60,

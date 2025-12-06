@@ -31,19 +31,40 @@ def get_stock(url, pattern, headers=None):
     请求目标页面并根据给定模式判断是否有货。
     返回值：有货返回 True，无货返回 False
     url：目标页面的 URL
-    pattern: 一个用于匹配"缺货"状态的正则表达式字符串，如 "Out of Stock"
+    pattern: 一个用于匹配"缺货"状态的正则表达式字符串
     headers: 可选的请求头字典
     '''
-    req = urllib.request.Request(url, None, headers)
-    respond = urllib.request.urlopen(req).read().decode('utf-8')
-
+    # 默认请求头（完整浏览器伪装 + Cookie）
+    default_headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        "Cache-Control": "max-age=0",
+        "Cookie": "OptanonAlertBoxClosed=2025-11-17T13:32:57.792Z",
+        "Priority": "u=0, i",
+        "Referer": url,
+        "Sec-CH-UA": '"Chromium";v="142", "Microsoft Edge";v="142", "Not_A Brand";v="99"',
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
+    }
+    
+    if headers:
+        default_headers.update(headers)
+    
+    req = urllib.request.Request(url, None, default_headers)
+    try:
+        respond = urllib.request.urlopen(req, timeout=10).read().decode('utf-8')
+    except Exception as e:
+        logging.error("请求 URL %s 失败: %s" % (url, str(e)))
+        raise
+    
     re_stock = re.compile(r"%s" % pattern)
-
-    # pattern 命中表示"缺货"，否则视为"有货"
-    if re_stock.search(respond):
-        return False
-    else:
-        return True
+    return not re_stock.search(respond)  # True=有货, False=无货
 
 def _format_addr(s):
     name, addr = parseaddr(s)

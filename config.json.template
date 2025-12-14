@@ -14,18 +14,33 @@
   },
   "global": {
     "check_interval": 60,
-    "log_level": "DEBUG"
+    "log_level": "DEBUG",
+    "default_headers": {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+    }
   },
   "monitors": [
     {
       "name": "DC6-512M-500G-49.9",
       "url": "https://bwh88.net/cart.php?a=add&pid=94&aff=58257",
-      "pattern": "Out of Stock"
+      "pattern": "Out of Stock",
+      "headers": {
+        "Sec-CH-UA": "\"Chromium\";v=\"142\", \"Microsoft Edge\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"macOS\"",
+        "Cookie": "foo=bar"
+      }
     },
     {
       "name": "NetCup-1o",
       "url": "https://www.netcup.com/de/server/vps/vps-piko-g11s-12m",
-      "pattern": "Produkt ist ausverkauft"
+      "pattern": "Produkt ist ausverkauft",
+      "headers": {
+        "Accept-Language": "de-DE,de;q=0.9",
+        "Cookie": "session=abc"
+      }
     }
   ]
 }

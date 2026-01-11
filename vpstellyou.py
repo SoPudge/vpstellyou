@@ -9,7 +9,7 @@ import urllib.request
 from urllib.parse import urlparse
 import logging
 import smtplib
-from datetime import datetime
+from datetime import datetime, time
 from email import encoders
 from email.header import Header
 from email.mime.text import MIMEText
@@ -220,25 +220,24 @@ def process_monitor(monitor, mail_config, default_headers):
     else:
         logging.info("[%s] 没有补货，不发送邮件" % name)
 
+def _parse_hhmm(hhmm: str) -> time:
+    hh, mm = hhmm.strip().split(":")
+    return time(int(hh), int(mm))
+
 def run_monitor(config):
     '''
     运行监控循环
     config: 配置对象
     '''
     # 解构赋值获取全局配置
+    mail_config = config.get('mail', {})
     global_config = config.get('global', {})
     check_interval = global_config.get('check_interval', 60)
-    log_level = global_config.get('log_level', 'DEBUG')
-    default_headers = global_config.get('default_headers', {})
-    # 从邮件配置中获取心跳时间
-    mail_config = config['mail']
-    heartbeat_time = mail_config.get('heartbeat_time', '12:00')  # 默认中午12点
 
-    # 更新日志级别
-    logging.getLogger().setLevel(getattr(logging, log_level, logging.DEBUG))
+    heartbeat_time_str = mail_config.get('heartbeat_time', '08:00')
+    heartbeat_time = _parse_hhmm(heartbeat_time_str)
 
-    # 解析心跳时间
-    heartbeat_hour, heartbeat_minute = map(int, heartbeat_time.split(':'))
+    last_heartbeat_date = None  # 只在内存中保证“每天一次”
 
     logging.info("=" * 50)
     logging.info("程序启动，配置文件加载成功")
@@ -261,15 +260,17 @@ def run_monitor(config):
     # 循环检查
     try:
         while True:
-            current_time = datetime.now()
-            
-            # 检查是否到达心跳时间
-            if current_time.hour == heartbeat_hour and current_time.minute == heartbeat_minute:
-                logging.info("到达心跳时间，发送心跳邮件")
-                print("发送心跳邮件...")
-                test_mail(mail_config, monitors)
-            
-            # 处理所有监控任务
+            now = datetime.now()
+
+            # 1) 到点后首次执行补发（避免错过 08:00）
+            if now.time() >= heartbeat_time and last_heartbeat_date != now.date():
+                try:
+                    test_mail(mail_config, config.get('monitors', []))
+                    last_heartbeat_date = now.date()
+                except Exception as e:
+                    logging.exception("心跳邮件发送失败: %s", e)
+
+            # 2) 正常监控逻辑
             for monitor in monitors:
                 try:
                     process_monitor(monitor, mail_config, default_headers)

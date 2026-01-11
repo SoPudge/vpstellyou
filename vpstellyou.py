@@ -4,12 +4,12 @@ import os
 import re
 import json
 import sys
-import time
+import time as time_module
 import urllib.request
 from urllib.parse import urlparse
 import logging
 import smtplib
-from datetime import datetime, time
+from datetime import datetime, time as dt_time
 from email import encoders
 from email.header import Header
 from email.mime.text import MIMEText
@@ -220,9 +220,9 @@ def process_monitor(monitor, mail_config, default_headers):
     else:
         logging.info("[%s] 没有补货，不发送邮件" % name)
 
-def _parse_hhmm(hhmm: str) -> time:
+def _parse_hhmm(hhmm: str) -> dt_time:
     hh, mm = hhmm.strip().split(":")
-    return time(int(hh), int(mm))
+    return dt_time(int(hh), int(mm))
 
 def run_monitor(config):
     '''
@@ -233,6 +233,12 @@ def run_monitor(config):
     mail_config = config.get('mail', {})
     global_config = config.get('global', {})
     check_interval = global_config.get('check_interval', 60)
+    log_level = global_config.get('log_level', 'DEBUG')
+
+    # 从 global 读取默认 headers（必需）
+    default_headers = global_config.get('default_headers', {})
+    if not isinstance(default_headers, dict):
+        raise ValueError("配置错误：global.default_headers 必须是一个 JSON 对象(dict)")
 
     heartbeat_time_str = mail_config.get('heartbeat_time', '08:00')
     heartbeat_time = _parse_hhmm(heartbeat_time_str)
@@ -262,7 +268,6 @@ def run_monitor(config):
         while True:
             now = datetime.now()
 
-            # 1) 到点后首次执行补发（避免错过 08:00）
             if now.time() >= heartbeat_time and last_heartbeat_date != now.date():
                 try:
                     test_mail(mail_config, config.get('monitors', []))
@@ -270,15 +275,14 @@ def run_monitor(config):
                 except Exception as e:
                     logging.exception("心跳邮件发送失败: %s", e)
 
-            # 2) 正常监控逻辑
             for monitor in monitors:
                 try:
                     process_monitor(monitor, mail_config, default_headers)
                 except Exception as e:
                     logging.error("处理监控任务 [%s] 时出错: %s" % (monitor.get('name', 'Unknown'), str(e)))
-            
+
             logging.info("本次检查完成，等待 %d 秒后进行下次检查" % check_interval)
-            time.sleep(check_interval)
+            time_module.sleep(check_interval)
     except KeyboardInterrupt:
         print("\n程序已停止")
         logging.info("程序被用户中断")
